@@ -1,5 +1,10 @@
 ﻿using sistema.Modelos.Conta;
 using sistema_ATENDIMENTO.sistema.Exceptions;
+using CsvHelper;
+using System.Globalization;
+using System.IO;
+using System.Linq;
+using sistema_ATENDIMENTO.sistema.Modelos.Conta;
 
 namespace sistema_ATENDIMENTO.Sistema.Atendimento
 {
@@ -8,6 +13,7 @@ namespace sistema_ATENDIMENTO.Sistema.Atendimento
     {
         // CRUD Create Read Update Delete
 
+        private string arquivoCSV = "contas.csv";
 
         // Lista de contas Pré-Cadastrada
         private List<ContaCorrente> _listaDeContas = new List<ContaCorrente>()
@@ -17,10 +23,50 @@ namespace sistema_ATENDIMENTO.Sistema.Atendimento
             new ContaCorrente(94, "123456-W") { Saldo = 60, Titular = new Cliente { Cpf = "3333333", Nome = "Tiago" } }
         };
 
+        private void CarregarContasDoCSV()
+        {
+            if (File.Exists(arquivoCSV))
+            {
+                using (var reader = new StreamReader(arquivoCSV))
+                using (var csv = new CsvReader(reader, CultureInfo.InvariantCulture))
+                {
+                    _listaDeContas = csv.GetRecords<ContaCorrenteCSV>()
+                        .Select(contaCSV => new ContaCorrente(contaCSV.NumeroAgencia, contaCSV.Conta)
+                        {
+                            Saldo = contaCSV.Saldo,
+                            Titular = new Cliente
+                            {
+                                Nome = contaCSV.NomeTitular,
+                                Cpf = contaCSV.CpfTitular,
+                                Profissao = contaCSV.ProfissaoTitular
+                            },
+                            Nome_Agencia = contaCSV.NomeAgencia
+                        }).ToList();
+                }
+            }
+        }
+        private void SalvarContasNoCSV()
+        {
+            using (var writer = new StreamWriter(arquivoCSV))
+            using (var csv = new CsvWriter(writer, CultureInfo.InvariantCulture))
+            {
+                csv.WriteRecords(_listaDeContas.Select(conta => new ContaCorrenteCSV
+                {
+                    NumeroAgencia = conta.Numero_agencia,
+                    Conta = conta.Conta,
+                    Saldo = conta.Saldo,
+                    NomeTitular = conta.Titular.Nome,
+                    NomeAgencia = conta.Nome_Agencia,
+                    CpfTitular = conta.Titular.Cpf,
+                    ProfissaoTitular = conta.Titular.Profissao
+                }));
+            }
+        }
 
         //Metodo Inicial de escolha de opção
         public void AtendimentoCliente()
         {
+            CarregarContasDoCSV();
             try
             {
                 char opcao = '0';
@@ -85,6 +131,7 @@ namespace sistema_ATENDIMENTO.Sistema.Atendimento
 
         private void EncerrarAplicacao()
         {
+            SalvarContasNoCSV();
             Console.WriteLine("... Encerrando a aplicação ...");
             Console.ReadKey();
         }
